@@ -25,6 +25,11 @@ function Cuenta() {
               </div>
 
               <Row className="cuenta-info-row">
+                <Col><strong>ID de usuario:</strong></Col>
+                <Col>{usuario.id}</Col>
+              </Row>
+              
+              <Row className="cuenta-info-row">
                 <Col><strong>Nombre:</strong></Col>
                 <Col>{usuario.nombre}</Col>
               </Row>
@@ -47,7 +52,6 @@ function Cuenta() {
                   </span>
                 </Col>
               </Row>
-
               <div className="text-center mt-4">
                 <Button 
                   variant="success" 
