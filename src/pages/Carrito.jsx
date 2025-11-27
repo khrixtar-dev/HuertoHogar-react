@@ -1,17 +1,22 @@
 import React, { useState, useEffect } from "react";
 import { Container, Row, Col, Card, Button, ListGroup } from "react-bootstrap";
+import { useNavigate } from "react-router-dom";
 import { PRODUCTOS } from "../../public/js/productos_catalogo";
 import {
   obtenerCarrito,
   agregarAlCarrito,
   quitarDelCarrito,
   eliminarDelCarrito,
+  vaciarCarrito,
 } from "../../public/js/carrito";
+import { obtenerUsuarioActual, cuentaIniciada } from "../../public/js/persistenciaLogin";
+import Swal from "sweetalert2";
 import "../css/carrito.css";
 
 function Carrito() {
   const [carrito, setCarrito] = useState([]);
   const [productosCarrito, setProductosCarrito] = useState([]);
+  const navigate = useNavigate();
 
   useEffect(() => {
     cargarCarrito();
@@ -60,6 +65,44 @@ function Carrito() {
       (total, producto) => total + producto.precio * producto.cantidad,
       0
     );
+  };
+
+  const manejarPago = () => {
+    // Generar datos de la boleta
+    const boletaData = {
+      id: Date.now(),
+      fecha: new Date().toLocaleDateString('es-CL'),
+      productos: productosCarrito.map(p => ({
+        nombre: p.nombre,
+        cantidad: p.cantidad,
+        precio: p.precio
+      })),
+      total: calcularTotal(),
+      usuarioId: cuentaIniciada() ? obtenerUsuarioActual().correo : null
+    };
+
+    // Guardar en localStorage si el usuario está logueado
+    if (cuentaIniciada()) {
+      const tickets = localStorage.getItem('tickets');
+      const ticketsArray = tickets ? JSON.parse(tickets) : [];
+      ticketsArray.push(boletaData);
+      localStorage.setItem('tickets', JSON.stringify(ticketsArray));
+    }
+
+    Swal.fire({
+      icon: "success",
+      title: "¡Compra realizada con éxito!",
+      text: "Tu pedido ha sido procesado correctamente",
+      toast: true,
+      position: "bottom-center",
+      timer: 2000,
+      showConfirmButton: false,
+    });
+
+    setTimeout(() => {
+      vaciarCarrito();
+      navigate('/boleta', { state: { boletaData } });
+    }, 2000);
   };
 
   // SI EL CARRITO ESTA VACIO
@@ -187,7 +230,12 @@ function Carrito() {
                   </strong>
                 </div>
               </div>
-              <Button variant="success" size="lg" className="w-100 btn-pagar">
+              <Button 
+                variant="success" 
+                size="lg" 
+                className="w-100 btn-pagar"
+                onClick={manejarPago}
+              >
                 Ir a Pagar
               </Button>
             </Card.Body>

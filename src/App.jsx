@@ -11,6 +11,8 @@ import LoginCliente from "./pages/LoginClientes";
 import LoginAdmin from "./pages/LoginAdmin";
 import Registro from "./pages/Registro";
 import Cuenta from "./pages/Cuenta";
+import Boleta from "./pages/Boleta";
+import MisCompras from "./pages/MisCompras";
 import HomeAdmin from "./pages/admin/HomeAdmin";
 
 import { Route, Routes, BrowserRouter as Router } from "react-router-dom";
@@ -31,6 +33,8 @@ function App() {
         <Route path="/login_cliente" element={<LoginCliente />} />
         <Route path="/registro" element={<Registro />} />
         <Route path="/cuenta" element={<Cuenta />} />
+        <Route path="/boleta" element={<Boleta />} />
+        <Route path="/mis-compras" element={<MisCompras />} />
         {/* Admin */}
         <Route path="/login_admin" element={<LoginAdmin />} />
         <Route path="/admin" element={<HomeAdmin />} />

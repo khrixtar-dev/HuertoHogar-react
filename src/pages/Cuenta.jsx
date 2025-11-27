@@ -1,10 +1,12 @@
 import React from 'react';
 import { Container, Row, Col, Card, Button } from 'react-bootstrap';
+import { useNavigate } from 'react-router-dom';
 import { obtenerUsuarioActual, cuentaIniciada } from '../../public/js/persistenciaLogin';
 import '../css/cuenta.css';
 
 function Cuenta() {
   const usuario = obtenerUsuarioActual();
+  const navigate = useNavigate();
   return (
     <Container className="cuenta-container">
       <Row className="justify-content-center">
@@ -45,6 +47,15 @@ function Cuenta() {
                   </span>
                 </Col>
               </Row>
+
+              <div className="text-center mt-4">
+                <Button 
+                  variant="success" 
+                  onClick={() => navigate('/mis-compras')}
+                >
+                  Ver mis compras
+                </Button>
+              </div>
             </Card.Body>
           </Card>
         </Col>
