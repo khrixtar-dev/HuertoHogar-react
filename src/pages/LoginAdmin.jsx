@@ -2,23 +2,21 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Container, Row, Col, Form, Button } from "react-bootstrap";
 import Swal from "sweetalert2";
-
-import {
-  validarLogin,
-  validarPermisos,
-} from "../../public/js/validacionesLogin";
-import { usuarios } from "../../public/js/usuarios";
+import { validarLogin } from "../../public/js/validacionesLogin";
+import { useAuth } from "../context/AuthContext";
+import { jwtDecode } from "jwt-decode";
 import "../css/login-admin.css";
 
 export default function LoginAdmin() {
   const [correo, setCorreo] = useState("");
   const [contraseña, setContraseña] = useState("");
+  const { login } = useAuth();
   const navigate = useNavigate();
 
-  const submitCredenciales = (e) => {
+  const submitCredenciales = async (e) => {
     e.preventDefault();
 
-    // 1. Validar formato (correo / contraseña)
+    // Validar formato
     const errores = validarLogin(correo, contraseña);
     if (errores.length > 0) {
       Swal.fire({
@@ -33,65 +31,75 @@ export default function LoginAdmin() {
       return;
     }
 
-    // 2. Buscar usuario
-    const usuario = usuarios.find(
-      (u) => u.correo === correo && u.contraseña === contraseña
-    );
+    try {
+      // Llamar al backend real
+      const resp = await fetch("http://localhost:8080/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: correo,
+          password: contraseña,
+        }),
+      });
 
-    // 3. Validar existencia del usuario antes de permisos
-    if (!usuario) {
+      if (!resp.ok) {
+        throw new Error("Credenciales incorrectas");
+      }
+
+      const data = await resp.json();
+      const token = data.token;
+
+      // Decodificar JWT para validar rol
+      const payload = jwtDecode(token);
+      const roles = payload.roles || [];
+
+      const esAdmin = roles.some((r) => r.authority === "ADMIN");
+      if (!esAdmin) {
+        Swal.fire({
+          icon: "error",
+          title: "Acceso denegado",
+          text: "Esta cuenta no tiene permisos de administrador.",
+          toast: true,
+          position: "bottom-center",
+          timer: 2500,
+          showConfirmButton: false,
+        });
+        return;
+      }
+
+      // Guardar token
+      login(token);
+
+      Swal.fire({
+        icon: "success",
+        title: "Bienvenido administrador",
+        text: "Accediendo al panel...",
+        toast: true,
+        position: "bottom-center",
+        timer: 1800,
+        showConfirmButton: false,
+      });
+
+      setTimeout(() => {
+        navigate("/admin");
+      }, 1800);
+    } catch (error) {
       Swal.fire({
         icon: "error",
-        title: "Credenciales incorrectas",
-        text: "El correo o la contraseña no coinciden con ningún administrador registrado.",
+        title: "Error de acceso",
+        text: error.message,
         toast: true,
         position: "bottom-center",
         timer: 3000,
         showConfirmButton: false,
       });
-      return;
     }
-
-    // 4. Validar permisos (solo administradores pueden ingresar)
-    const permisoError = validarPermisos(usuario, "admin");
-    if (permisoError) {
-      Swal.fire({
-        icon: "warning",
-        title: "Acceso restringido",
-        text: permisoError,
-        toast: true,
-        position: "bottom-center",
-        timer: 3000,
-        showConfirmButton: false,
-      });
-      return;
-    }
-
-    // 5. Guardar sesión en localStorage
-    localStorage.setItem("cuentaIniciada", "true");
-    localStorage.setItem("usuarioActual", JSON.stringify(usuario));
-
-    // 6. Mensaje de éxito y redirección
-    Swal.fire({
-      icon: "success",
-      title: `Bienvenido, ${usuario.nombre}!`,
-      text: "Accediendo al panel de administración...",
-      toast: true,
-      position: "bottom-center",
-      timer: 1800,
-      showConfirmButton: false,
-    });
-
-    setTimeout(() => {
-      navigate("/admin");
-      window.dispatchEvent(new Event("sesionActualizada"));
-    }, 1800);
   };
 
   return (
     <Container fluid className="login-fullscreen p-0">
       <Row className="g-0 vh-100">
-        {/* MITAD IZQUIERDA */}
+        {/* IZQUIERDA */}
         <Col
           md={6}
           className="login-left-admin d-flex flex-column justify-content-center align-items-center text-center p-5"
@@ -102,7 +110,7 @@ export default function LoginAdmin() {
           </p>
         </Col>
 
-        {/* MITAD DERECHA */}
+        {/* DERECHA */}
         <Col
           md={6}
           className="login-right-admin d-flex flex-column justify-content-center align-items-center text-center p-5"

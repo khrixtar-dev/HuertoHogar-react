@@ -1,32 +1,27 @@
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useState } from "react";
 import { Container, Row, Col, Form, Button } from "react-bootstrap";
-import { Link } from "react-router-dom";
 import Swal from "sweetalert2";
+import { Link } from "react-router-dom";
 
-import {
-  validarLogin,
-  validarPermisos,
-} from "../../public/js/validacionesLogin.js";
-
-import {
-  obtenerUsuarios,
-  setSesion,
-} from "../../public/js/persistenciaLogin.js";
+import { validarLogin } from "../../public/js/validacionesLogin.js";
+import { useAuth } from "../context/AuthContext";
+import { loginUsuario } from "../api/authApi";
 
 import "../css/login-clientes.css";
 
 export default function LoginCliente() {
-  const [correo, setCorreo] = useState("");
-  const [contraseña, setContraseña] = useState("");
-  const navigate = useNavigate();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
-  const submitCredenciales = (e) => {
+  const navigate = useNavigate();
+  const { login } = useAuth();
+
+  const submitCredenciales = async (e) => {
     e.preventDefault();
 
-    // 1. Validaciones de formato
-    const errores = validarLogin(correo, contraseña);
+    // Validación frontend
+    const errores = validarLogin(email, password);
     if (errores.length > 0) {
       Swal.fire({
         icon: "error",
@@ -40,60 +35,35 @@ export default function LoginCliente() {
       return;
     }
 
-    // 2. Buscar usuario en lista actual (incluye registrados)
-    const lista = obtenerUsuarios();
-    const usuario = lista.find(
-      (u) => u.correo === correo && u.contraseña === contraseña
-    );
+    try {
+      // Llamada correcta a la API (axios)
+      const data = await loginUsuario(email, password);
 
-    // 3. Usuario no encontrado
-    if (!usuario) {
+      // Guardar token global
+      login(data.token);
+
+      Swal.fire({
+        icon: "success",
+        title: "¡Bienvenido!",
+        text: "Inicio de sesión exitoso",
+        toast: true,
+        position: "bottom-center",
+        timer: 1800,
+        showConfirmButton: false,
+      });
+
+      setTimeout(() => navigate("/"), 1500);
+    } catch (error) {
       Swal.fire({
         icon: "error",
         title: "Credenciales incorrectas",
-        text: "El correo o la contraseña no coinciden.",
+        text: "El correo o la contraseña no son válidos.",
         toast: true,
         position: "bottom-center",
         timer: 3000,
         showConfirmButton: false,
       });
-      return;
     }
-
-    // 4. Validar permisos: este login es de cliente
-    const permisoError = validarPermisos(usuario, "cliente");
-    if (permisoError) {
-      Swal.fire({
-        icon: "warning",
-        title: "Acceso restringido",
-        text: permisoError,
-        toast: true,
-        position: "bottom-center",
-        timer: 3000,
-        showConfirmButton: false,
-      });
-      return;
-    }
-
-    // 5. Guardar sesión
-    setSesion(usuario);
-
-    // 6. Toast de éxito
-    Swal.fire({
-      icon: "success",
-      title: `¡Bienvenido, ${usuario.nombre}!`,
-      text: "Inicio de sesión exitoso",
-      toast: true,
-      position: "bottom-center",
-      timer: 1800,
-      showConfirmButton: false,
-    });
-
-    // 7. Redirigir y actualizar navbar
-    setTimeout(() => {
-      navigate("/");
-      window.dispatchEvent(new Event("sesionActualizada"));
-    }, 1800);
   };
 
   return (
@@ -104,11 +74,11 @@ export default function LoginCliente() {
           md={6}
           className="login-left-cliente d-flex flex-column justify-content-center align-items-center text-center p-5"
         >
-          <div className="logo-box mb-4 d-flex align-items-center justify-content-center">
+          <div className="logo-box mb-4">
             <img
               src="/img/navbar_footer_/LogoHuertoHogar.png"
               alt="Huerto Hogar"
-              style={{ width: "120px", height: "auto" }}
+              style={{ width: "120px" }}
             />
           </div>
 
@@ -119,23 +89,21 @@ export default function LoginCliente() {
             style={{ width: "80%", maxWidth: "400px" }}
             onSubmit={submitCredenciales}
           >
-            <Form.Group className="mb-3" controlId="email">
+            <Form.Group className="mb-3">
               <Form.Control
                 type="email"
                 placeholder="Correo electrónico"
-                value={correo}
-                onChange={(e) => setCorreo(e.target.value)}
-                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
               />
             </Form.Group>
 
-            <Form.Group className="mb-3" controlId="password">
+            <Form.Group className="mb-3">
               <Form.Control
                 type="password"
                 placeholder="Contraseña"
-                value={contraseña}
-                onChange={(e) => setContraseña(e.target.value)}
-                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
               />
             </Form.Group>
 
@@ -143,9 +111,6 @@ export default function LoginCliente() {
               INGRESAR
             </Button>
 
-            <a href="#" className="small text-success d-block mb-2">
-              ¿Olvidaste tu contraseña?
-            </a>
             <p className="small">
               ¿No tienes una cuenta?{" "}
               <Link to="/registro" className="text-success fw-semibold">
@@ -162,8 +127,7 @@ export default function LoginCliente() {
         >
           <h3 className="fw-bold mb-3">Más que una comunidad</h3>
           <p className="px-5">
-            Únete a Huerto Hogar y aprende a cultivar, cuidar y disfrutar de tu
-            propio huerto 🌿
+            Únete a Huerto Hogar y disfruta de lo mejor de la tierra 🌱
           </p>
         </Col>
       </Row>
