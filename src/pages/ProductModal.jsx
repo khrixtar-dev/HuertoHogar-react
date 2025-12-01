@@ -8,7 +8,6 @@ function ProductModal({ show, onHide, producto, onAgregarCarrito }) {
     return null;
   }
 
-  // AGREGA AL CARRITO SIN CERRAR EL MODAL
   const modalAgregarCarrito = () => {
     onAgregarCarrito(producto.id);
   };
@@ -16,24 +15,22 @@ function ProductModal({ show, onHide, producto, onAgregarCarrito }) {
   return (
     <Modal show={show} onHide={onHide} centered>
       <Modal.Header closeButton>
-        <Modal.Title>{producto.nombre}</Modal.Title>
+        <Modal.Title>{producto.name}</Modal.Title>
       </Modal.Header>
       
       <Modal.Body>
-        {/* Imagen del producto */}
         <div className="text-center mb-3">
           <img 
-            src={producto.imagen} 
-            alt={producto.nombre}
+            src={producto.urlImage} 
+            alt={producto.name}
             style={{ maxWidth: '100%', height: '200px', objectFit: 'cover' }}
           />
         </div>
         
-        {/* Información del producto */}
         <div>
           <p><strong>Código:</strong> {producto.id}</p>
-          <p><strong>Precio:</strong> ${producto.precio.toLocaleString()} CLP/kg</p>
-          <p><strong>Descripción:</strong> {producto.descripcion}</p>
+          <p><strong>Precio:</strong> ${producto.price ? producto.price.toLocaleString() : 'N/A'} CLP/kg</p>
+          <p><strong>Descripción:</strong> {producto.description || 'Sin descripción'}</p>
         </div>
       </Modal.Body>
       
