@@ -5,7 +5,7 @@ const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [token, setToken] = useState(null);
-  const [user, setUser] = useState(null); // <-- Guarda email y rol
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
     const savedToken = localStorage.getItem("authToken");
@@ -31,11 +31,6 @@ export function AuthProvider({ children }) {
       const decoded = jwtDecode(newToken);
       const role = decoded?.roles?.[0]?.authority || null;
 
-      // 🔥 TEMPORAL: solo permitir ADMIN
-      if (role !== "ADMIN") {
-        throw new Error("Usuario no autorizado (solo ADMIN temporalmente)");
-      }
-
       setToken(newToken);
       setUser({
         email: decoded.sub,
@@ -56,10 +51,11 @@ export function AuthProvider({ children }) {
   };
 
   const isAuthenticated = !!token;
+  const isAdmin = user?.role === "ADMIN";
 
   return (
     <AuthContext.Provider
-      value={{ token, user, isAuthenticated, login, logout }}
+      value={{ token, user, isAuthenticated, isAdmin, login, logout }}
     >
       {children}
     </AuthContext.Provider>

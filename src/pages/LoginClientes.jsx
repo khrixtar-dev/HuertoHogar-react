@@ -3,10 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { Container, Row, Col, Form, Button } from "react-bootstrap";
 import Swal from "sweetalert2";
 import { Link } from "react-router-dom";
+import { jwtDecode } from "jwt-decode";
 
 import { validarLogin } from "../../public/js/validacionesLogin.js";
 import { useAuth } from "../context/AuthContext";
 import { loginUsuario } from "../api/authApi";
+import { setSesion } from "../../public/js/persistenciaLogin";
 
 import "../css/login-clientes.css";
 
@@ -20,7 +22,6 @@ export default function LoginCliente() {
   const submitCredenciales = async (e) => {
     e.preventDefault();
 
-    // Validación frontend
     const errores = validarLogin(email, password);
     if (errores.length > 0) {
       Swal.fire({
@@ -36,11 +37,32 @@ export default function LoginCliente() {
     }
 
     try {
-      // Llamada correcta a la API (axios)
       const data = await loginUsuario(email, password);
-
-      // Guardar token global
       login(data.token);
+
+      const decoded = jwtDecode(data.token);
+      const nombre = decoded.sub?.split("@")[0] || "Usuario";
+
+      if (decoded.role === "ADMIN") {
+        Swal.fire({
+          icon: "error",
+          title: "Acceso denegado",
+          text: "Las cuentas de administrador no pueden iniciar sesión aquí.",
+          toast: true,
+          position: "bottom-center",
+          timer: 2500,
+          showConfirmButton: false,
+        });
+        return;
+      }
+
+      setSesion({
+        nombre: nombre,
+        correo: email,
+        admin: decoded.role === "ADMIN",
+      });
+
+      window.dispatchEvent(new Event("sesionActualizada"));
 
       Swal.fire({
         icon: "success",

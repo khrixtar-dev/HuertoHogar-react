@@ -6,6 +6,7 @@ import Swal from "sweetalert2";
 import { validarRegistro } from "../../public/js/validacion_registro.js";
 import { registrarUsuario } from "../api/authApi";
 import { useAuth } from "../context/AuthContext";
+import { setSesion } from "../../public/js/persistenciaLogin";
 
 import "../css/registro.css";
 
@@ -18,12 +19,11 @@ export default function Registro() {
   const [aceptaTerminos, setAceptaTerminos] = useState(false);
 
   const navigate = useNavigate();
-  const { login } = useAuth(); // guardar token
+  const { login } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // 1. Validaciones
     const errores = validarRegistro(
       nombre,
       apellido,
@@ -47,18 +47,24 @@ export default function Registro() {
     }
 
     try {
-      // 2. Enviar al backend REAL
       const data = await registrarUsuario({
         firstname: nombre,
         lastname: apellido,
         email: correo,
-        password: contraseña, // ESTE CAMPO ES CLAVE
+        password: contraseña,
       });
 
-      // 3. Guardar token automáticamente
       login(data.token);
 
-      // 4. Swal éxito
+      setSesion({
+        nombre: nombre,
+        apellido: apellido,
+        correo: correo,
+        admin: false,
+      });
+
+      window.dispatchEvent(new Event("sesionActualizada"));
+
       Swal.fire({
         icon: "success",
         title: `¡Bienvenido, ${nombre}!`,
@@ -69,7 +75,6 @@ export default function Registro() {
         showConfirmButton: false,
       });
 
-      // 5. Redirigir al home
       setTimeout(() => navigate("/"), 2000);
     } catch (error) {
       Swal.fire({

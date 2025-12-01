@@ -2,9 +2,13 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Container, Row, Col, Form, Button } from "react-bootstrap";
 import Swal from "sweetalert2";
+import { jwtDecode } from "jwt-decode";
+
 import { validarLogin } from "../../public/js/validacionesLogin";
 import { useAuth } from "../context/AuthContext";
-import { jwtDecode } from "jwt-decode";
+import { loginUsuario } from "../api/authApi";
+import { setSesion } from "../../public/js/persistenciaLogin";
+
 import "../css/login-admin.css";
 
 export default function LoginAdmin() {
@@ -16,7 +20,6 @@ export default function LoginAdmin() {
   const submitCredenciales = async (e) => {
     e.preventDefault();
 
-    // Validar formato
     const errores = validarLogin(correo, contraseña);
     if (errores.length > 0) {
       Swal.fire({
@@ -32,28 +35,10 @@ export default function LoginAdmin() {
     }
 
     try {
-      // Llamar al backend real
-      const resp = await fetch("http://localhost:8080/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: correo,
-          password: contraseña,
-        }),
-      });
+      const data = await loginUsuario(correo, contraseña);
+      const decoded = jwtDecode(data.token);
 
-      if (!resp.ok) {
-        throw new Error("Credenciales incorrectas");
-      }
-
-      const data = await resp.json();
-      const token = data.token;
-
-      // Decodificar JWT para validar rol
-      const payload = jwtDecode(token);
-      const roles = payload.roles || [];
-
-      const esAdmin = roles.some((r) => r.authority === "ADMIN");
+      const esAdmin = decoded.role === "ADMIN";
       if (!esAdmin) {
         Swal.fire({
           icon: "error",
@@ -67,13 +52,21 @@ export default function LoginAdmin() {
         return;
       }
 
-      // Guardar token
-      login(token);
+      login(data.token);
+
+      const nombre = decoded.sub?.split("@")[0] || "Administrador";
+      setSesion({
+        nombre: nombre,
+        correo: correo,
+        admin: true,
+      });
+
+      window.dispatchEvent(new Event("sesionActualizada"));
 
       Swal.fire({
         icon: "success",
-        title: "Bienvenido administrador",
-        text: "Accediendo al panel...",
+        title: "Bienvenido",
+        text: "Accediendo...",
         toast: true,
         position: "bottom-center",
         timer: 1800,
@@ -81,13 +74,13 @@ export default function LoginAdmin() {
       });
 
       setTimeout(() => {
-        navigate("/admin");
+        navigate("/");
       }, 1800);
     } catch (error) {
       Swal.fire({
         icon: "error",
         title: "Error de acceso",
-        text: error.message,
+        text: "Credenciales incorrectas",
         toast: true,
         position: "bottom-center",
         timer: 3000,
