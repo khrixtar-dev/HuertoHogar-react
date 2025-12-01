@@ -4,7 +4,9 @@ import { Link, useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 
 import { validarRegistro } from "../../public/js/validacion_registro.js";
-import { registrarUsuario, setSesion} from "../../public/js/persistenciaLogin.js";
+import { registrarUsuario } from "../api/authApi";
+import { useAuth } from "../context/AuthContext";
+import { setSesion } from "../../public/js/persistenciaLogin";
 
 import "../css/registro.css";
 
@@ -17,11 +19,12 @@ export default function Registro() {
   const [aceptaTerminos, setAceptaTerminos] = useState(false);
 
   const navigate = useNavigate();
+  const { login } = useAuth();
 
-  const handleSubmit = (e) => {e.preventDefault();
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-    // 1. Validar formulario
-    const esValido = validarRegistro(
+    const errores = validarRegistro(
       nombre,
       apellido,
       correo,
@@ -30,45 +33,56 @@ export default function Registro() {
       aceptaTerminos
     );
 
-    if (!esValido) {
-      return;
-    }
-
-    // 2. Registrar usuario
-    const resultado = registrarUsuario({ nombre, apellido, correo, contraseña });
-    
-    if (!resultado.success) {
+    if (errores.length > 0) {
       Swal.fire({
-        icon: "warning",
-        title: "Error en el registro",
-        text: resultado.error,
+        icon: "error",
+        title: "Errores en el registro",
+        html: errores.map((e) => `• ${e}`).join("<br>"),
         toast: true,
         position: "bottom-center",
-        timer: 3000,
+        timer: 4000,
         showConfirmButton: false,
       });
       return;
     }
 
-    // 3. Iniciar sesión automática
-    setSesion(resultado.usuario);
+    try {
+      const data = await registrarUsuario({
+        firstname: nombre,
+        lastname: apellido,
+        email: correo,
+        password: contraseña,
+      });
 
-    // 7. Feedback
-    Swal.fire({
-      icon: "success",
-      title: `¡Bienvenido, ${nombre}!`,
-      text: "Tu cuenta ha sido creada e iniciada.",
-      toast: true,
-      position: "bottom-center",
-      timer: 2200,
-      showConfirmButton: false,
-    });
+      login(data.token);
 
-    // 8. Redirigir + actualizar navbar
-    setTimeout(() => {
-      navigate("/");
+      setSesion({
+        nombre: nombre,
+        apellido: apellido,
+        correo: correo,
+        admin: false,
+      });
+
       window.dispatchEvent(new Event("sesionActualizada"));
-    }, 2200);
+
+      Swal.fire({
+        icon: "success",
+        title: `¡Bienvenido, ${nombre}!`,
+        text: "Tu cuenta ha sido creada e iniciada.",
+        toast: true,
+        position: "bottom-center",
+        timer: 2200,
+        showConfirmButton: false,
+      });
+
+      setTimeout(() => navigate("/"), 2000);
+    } catch (error) {
+      Swal.fire({
+        icon: "error",
+        title: "Error en el registro",
+        text: "El correo ya está registrado o hubo un problema.",
+      });
+    }
   };
 
   return (
@@ -80,75 +94,64 @@ export default function Registro() {
           </h3>
 
           <Form onSubmit={handleSubmit}>
-            <Form.Group className="mb-3" controlId="nombre">
+            <Form.Group className="mb-3">
               <Form.Label>Nombre</Form.Label>
               <Form.Control
                 type="text"
-                placeholder="Ingresa tu nombre"
                 value={nombre}
                 onChange={(e) => setNombre(e.target.value)}
-                required
               />
             </Form.Group>
 
-            <Form.Group className="mb-3" controlId="apellido">
+            <Form.Group className="mb-3">
               <Form.Label>Apellido</Form.Label>
               <Form.Control
                 type="text"
-                placeholder="Ingresa tu apellido"
                 value={apellido}
                 onChange={(e) => setApellido(e.target.value)}
-                required
               />
             </Form.Group>
 
-            <Form.Group className="mb-3" controlId="email">
-              <Form.Label>Correo electrónico</Form.Label>
+            <Form.Group className="mb-3">
+              <Form.Label>Correo</Form.Label>
               <Form.Control
                 type="email"
-                placeholder="Ingresa tu correo"
                 value={correo}
                 onChange={(e) => setCorreo(e.target.value)}
-                required
               />
             </Form.Group>
 
-            <Form.Group className="mb-3" controlId="password">
+            <Form.Group className="mb-3">
               <Form.Label>Contraseña</Form.Label>
               <Form.Control
                 type="password"
-                placeholder="Ingresa tu contraseña"
                 value={contraseña}
                 onChange={(e) => setContraseña(e.target.value)}
-                required
               />
             </Form.Group>
 
-            <Form.Group className="mb-4" controlId="repeatPassword">
+            <Form.Group className="mb-3">
               <Form.Label>Repetir contraseña</Form.Label>
               <Form.Control
                 type="password"
-                placeholder="Repite tu contraseña"
                 value={repetirContraseña}
                 onChange={(e) => setRepetirContraseña(e.target.value)}
-                required
               />
             </Form.Group>
 
-            <Form.Group className="mb-3" controlId="terms">
+            <Form.Group className="mb-3">
               <Form.Check
                 type="checkbox"
                 checked={aceptaTerminos}
                 onChange={(e) => setAceptaTerminos(e.target.checked)}
                 label={
                   <>
-                    Acepto todos los términos en{" "}
+                    Acepto los{" "}
                     <a href="#" className="text-success">
-                      Términos de servicio
+                      términos del servicio
                     </a>
                   </>
                 }
-                required
               />
             </Form.Group>
 
@@ -158,11 +161,7 @@ export default function Registro() {
 
             <p className="text-center small">
               ¿Ya tienes una cuenta?{" "}
-              <Link
-                to="/login_cliente"
-                className="text-success fw-semibold"
-                translate="no"
-              >
+              <Link to="/login_cliente" className="text-success fw-semibold">
                 Inicia sesión aquí
               </Link>
             </p>
