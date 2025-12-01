@@ -1,7 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import Carousel from 'react-bootstrap/Carousel';
 import { Container, Row, Col, Button, Card } from 'react-bootstrap';
-import { getProductos, getProductoRandom } from '../../public/js/productos_catalogo';
+import { getProductos } from '../api/productApi';
 import { agregarAlCarrito } from '../../public/js/carrito';
 import ProductModal from './ProductModal';
 import '../css/home.css';
@@ -9,15 +9,13 @@ import '../css/home.css';
 function ProductCard({ producto, onVerProducto, onAgregarCarrito }) {
   return (
     <Card className="home-product-card">
-      <Card.Img variant="top" src={producto.imagen} alt={producto.nombre} />
+      <Card.Img variant="top" src={producto.urlImage} alt={producto.name} />
       <Card.Body>
         <Card.Title>
-          {producto.nombre}
+          {producto.name}
         </Card.Title>
         <Card.Text>
-          ${
-            producto.precio.toLocaleString()
-          } CLP/kg
+          ${producto.price ? producto.price.toLocaleString() : 'N/A'} CLP/kg
         </Card.Text>
         <div className="btn-container">
           <Button className="btn-ver-producto" size="sm" variant="success" onClick={
@@ -37,30 +35,30 @@ function ProductCard({ producto, onVerProducto, onAgregarCarrito }) {
 }
 
 function Home() {
-  // Estados para controlar el modal
-  const [showModal, setShowModal] = useState(
-    false
-  );
-  const [productoSeleccionado, setProductoSeleccionado] = useState(
-    null
-  );
+  const [showModal, setShowModal] = useState(false);
+  const [productoSeleccionado, setProductoSeleccionado] = useState(null);
+  const [productosAleatorios, setProductosAleatorios] = useState([]);
 
-  // Productos aleatorios cargados del localStorage
-  const productosAleatorios = useMemo(
-    () => getProductoRandom(getProductos(), 4), 
-    []
-  );
+  useEffect(() => {
+    cargarProductos();
+  }, []);
 
-  // Función para abrir el modal con el producto seleccionado
+  const cargarProductos = async () => {
+    try {
+      const data = await getProductos();
+      const aleatorios = data.sort(() => Math.random() - 0.5).slice(0, 4);
+      setProductosAleatorios(aleatorios);
+    } catch (error) {
+      console.error('Error cargando productos:', error);
+    }
+  };
+
   const verProductoModal = (id) => {
-    const producto = getProductos().find(
-      p => p.id === id
-    );
+    const producto = productosAleatorios.find(p => p.id === id);
     setProductoSeleccionado(producto);
     setShowModal(true);
   };
 
-  // Función para cerrar el modal
   const cerrarModal = () => {
     setShowModal(false);
     setProductoSeleccionado(null);
@@ -68,10 +66,7 @@ function Home() {
 
   const agregarCarritoModal = (id) => {
     agregarAlCarrito(id);
-    console.log(
-      'Producto agregado al carrito:', 
-      id
-    );
+    console.log('Producto agregado al carrito:', id);
   };
 
   return (
@@ -120,7 +115,7 @@ function Home() {
             />
             <Carousel.Caption>
               <h3>Confianza y cercanía</h3>
-              <p>  Del agricultor directo a tu mesa, con el cariño del campo chileno</p>
+              <p>Del agricultor directo a tu mesa, con el cariño del campo chileno</p>
             </Carousel.Caption>
           </Carousel.Item>
         </Carousel>
@@ -131,26 +126,19 @@ function Home() {
           Productos Recomendados
         </h3>
         <Row>
-          {productosAleatorios.map(
-            producto => (
-              <Col key={
-                producto.id
-              } xs={6} md={3} className="mb-4 d-flex justify-content-center">
-                <ProductCard
-                  producto={producto}
-                  onVerProducto={verProductoModal}
-                  onAgregarCarrito={agregarCarritoModal}
-                />
-              </Col>
-            )
-          )}
+          {productosAleatorios.map(producto => (
+            <Col key={producto.id} xs={6} md={3} className="mb-4 d-flex justify-content-center">
+              <ProductCard
+                producto={producto}
+                onVerProducto={verProductoModal}
+                onAgregarCarrito={agregarCarritoModal}
+              />
+            </Col>
+          ))}
         </Row>
       </Container>
       
-      <div className={
-        'about-container'
-      }>
-
+      <div className="about-container">
         <h3>
           Acerca de HuertoHogar
         </h3>
@@ -167,13 +155,14 @@ function Home() {
         </p>
       </div>
       
-      {/* Modal para mostrar detalles del producto */}
-      <ProductModal
-        show={showModal}
-        onHide={cerrarModal}
-        producto={productoSeleccionado}
-        onAgregarCarrito={agregarCarritoModal}
-      />
+      {productoSeleccionado && (
+        <ProductModal
+          show={showModal}
+          onHide={cerrarModal}
+          producto={productoSeleccionado}
+          onAgregarCarrito={agregarCarritoModal}
+        />
+      )}
     </div>
   )
 }

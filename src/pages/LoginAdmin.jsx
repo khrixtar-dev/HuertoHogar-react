@@ -38,7 +38,7 @@ export default function LoginAdmin() {
       const data = await loginUsuario(correo, contraseña);
       const decoded = jwtDecode(data.token);
 
-      const esAdmin = decoded.role === "ADMIN";
+      const esAdmin = decoded.type === "ADMIN";
       if (!esAdmin) {
         Swal.fire({
           icon: "error",

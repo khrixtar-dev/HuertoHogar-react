@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Form, Button, Card } from 'react-bootstrap';
-import { PRODUCTOS, getCategorias } from '../../public/js/productos_catalogo';
+import { getProductos } from '../api/productApi';
 import { agregarAlCarrito } from '../../public/js/carrito';
 import ProductModal from './ProductModal';
 import '../css/tienda.css';
@@ -8,15 +8,13 @@ import '../css/tienda.css';
 function ProductCard({ producto, onVerProducto, onAgregarCarrito }) {
   return (
     <Card className="product-card">
-      <Card.Img variant="top" src={producto.imagen} alt={producto.nombre} />
+      <Card.Img variant="top" src={producto.urlImage} alt={producto.name} />
       <Card.Body>
         <Card.Title>
-          {producto.nombre}
+          {producto.name}
         </Card.Title>
         <Card.Text>
-          ${
-            producto.precio.toLocaleString()
-          } CLP/kg
+          ${producto.price ? producto.price.toLocaleString() : 'N/A'} CLP/kg
         </Card.Text>
         <div className="btn-container">
           <Button className="btn-ver-producto" size="sm" variant="success" onClick={
@@ -36,44 +34,38 @@ function ProductCard({ producto, onVerProducto, onAgregarCarrito }) {
 }
 
 function Tienda() {
-  const [filtroCategoria, setFiltroCategoria] = useState(
-    ''
-  );
-  // ESTADOS PARA CONTROLAR EL MODAL
-  const [showModal, setShowModal] = useState(
-    false
-  );
-  const [productoSeleccionado, setProductoSeleccionado] = useState(
-    null
-  );
-  const categorias = getCategorias();
+  const [filtroCategoria, setFiltroCategoria] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [productoSeleccionado, setProductoSeleccionado] = useState(null);
+  const [productos, setProductos] = useState([]);
+  const [categorias, setCategorias] = useState([]);
 
-  const productosFiltrados = [];
-  for (
-    let i = 0; 
-    i < PRODUCTOS.length; 
-    i++
-  ) {
-    if (
-      !filtroCategoria || 
-      PRODUCTOS[i].categoria === filtroCategoria
-    ) {
-      productosFiltrados.push(
-        PRODUCTOS[i]
-      );
+  useEffect(() => {
+    cargarProductos();
+  }, []);
+
+  const cargarProductos = async () => {
+    try {
+      const data = await getProductos();
+      setProductos(data);
+      
+      const categoriasUnicas = [...new Set(data.map(p => p.categoryName))];
+      setCategorias(categoriasUnicas);
+    } catch (error) {
+      console.error('Error cargando productos:', error);
     }
-  }
+  };
 
-  // ABRI EL MODAL SEGUN EL ID DEL PRODUCTO
+  const productosFiltrados = filtroCategoria 
+    ? productos.filter(p => p.categoryName === filtroCategoria)
+    : productos;
+
   const VerProducto = (id) => {
-    const producto = PRODUCTOS.find(
-      p => p.id === id
-    );
+    const producto = productos.find(p => p.id === id);
     setProductoSeleccionado(producto);
     setShowModal(true);
   };
 
-  // CIERRA EL MODAL Y DEJA EL PRODUCTO SELECCIONADO EN NULL
   const CerrarModal = () => {
     setShowModal(false);
     setProductoSeleccionado(null);
@@ -81,11 +73,9 @@ function Tienda() {
 
   const AgregarCarrito = (id) => {
     agregarAlCarrito(id);
-    console.log(
-      'Producto agregado al carrito:', 
-      id
-    );
+    console.log('Producto agregado al carrito:', id);
   };
+
   return (
     <>
       <Container>
@@ -96,60 +86,44 @@ function Tienda() {
         <Row className="mb-4">
           <Col md={4}>
             <Form.Select className='form-select'
-              value={
-                filtroCategoria
-              }
-              onChange={
-                (e) => setFiltroCategoria(e.target.value)
-              }
+              value={filtroCategoria}
+              onChange={(e) => setFiltroCategoria(e.target.value)}
             >
               <option value="">
                 Todas las categorías
               </option>
-              {categorias.map(
-                categoria => (
+              {categorias.map(categoria => {
+                const nombreCategoria = categoria.replace(/_/g, ' ');
+                return (
                   <option key={categoria} value={categoria}>
-                    {
-                      categoria.charAt(0).toUpperCase() + categoria.slice(1)
-                    }
+                    {nombreCategoria.charAt(0).toUpperCase() + nombreCategoria.slice(1)}
                   </option>
-                )
-              )}
+                );
+              })}
             </Form.Select>
           </Col>
         </Row>
 
         <Row className="justify-content-center">
-          {productosFiltrados.map(
-            producto => (
-              <Col key={
-                producto.id
-              } xs={6} md={3} className="mb-4 d-flex justify-content-center">
-                <ProductCard
-                  producto={producto}
-                  onVerProducto={VerProducto}
-                  onAgregarCarrito={AgregarCarrito}
-                />
-              </Col>
-            )
-          )}
+          {productosFiltrados.map(producto => (
+            <Col key={producto.id} xs={6} md={3} className="mb-4 d-flex justify-content-center">
+              <ProductCard
+                producto={producto}
+                onVerProducto={VerProducto}
+                onAgregarCarrito={AgregarCarrito}
+              />
+            </Col>
+          ))}
         </Row>
 
-        {/* MODAL PARA MOSTRAR DETALLES DEL PRODUCTO */}
-        <ProductModal
-          show={
-            showModal
-          }
-          onHide={
-            CerrarModal
-          }
-          producto={
-            productoSeleccionado
-          }
-          onAgregarCarrito={
-            AgregarCarrito
-          }
-        />
+        {productoSeleccionado && (
+          <ProductModal
+            show={showModal}
+            onHide={CerrarModal}
+            producto={productoSeleccionado}
+            onAgregarCarrito={AgregarCarrito}
+          />
+        )}
       </Container>
     </>
   );
