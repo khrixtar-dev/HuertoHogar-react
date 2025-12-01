@@ -43,7 +43,7 @@ export default function LoginCliente() {
       const decoded = jwtDecode(data.token);
       const nombre = decoded.sub?.split("@")[0] || "Usuario";
 
-      if (decoded.role === "ADMIN") {
+      if (decoded.type === "ADMIN") {
         Swal.fire({
           icon: "error",
           title: "Acceso denegado",
@@ -59,7 +59,7 @@ export default function LoginCliente() {
       setSesion({
         nombre: nombre,
         correo: email,
-        admin: decoded.role === "ADMIN",
+        admin: decoded.type === "ADMIN",
       });
 
       window.dispatchEvent(new Event("sesionActualizada"));
