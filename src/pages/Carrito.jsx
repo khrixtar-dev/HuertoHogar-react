@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Container, Row, Col, Card, Button, ListGroup } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
-import { PRODUCTOS } from "../../public/js/productos_catalogo";
+
 import {
   obtenerCarrito,
   agregarAlCarrito,
@@ -9,103 +9,147 @@ import {
   eliminarDelCarrito,
   vaciarCarrito,
 } from "../../public/js/carrito";
-import { obtenerUsuarioActual, cuentaIniciada } from "../../public/js/persistenciaLogin";
+
+import {
+  obtenerUsuarioActual,
+  cuentaIniciada,
+} from "../../public/js/persistenciaLogin";
+import { getProductos } from "../api/productApi";
+
 import Swal from "sweetalert2";
 import "../css/carrito.css";
 
 function Carrito() {
   const [carrito, setCarrito] = useState([]);
+  const [productosBD, setProductosBD] = useState([]);
   const [productosCarrito, setProductosCarrito] = useState([]);
   const navigate = useNavigate();
 
+  // Cargar productos BD una vez
   useEffect(() => {
-    cargarCarrito();
-  }, []);
-
-  const cargarCarrito = () => {
-    const carritoItems = obtenerCarrito();
-    setCarrito(carritoItems);
-
-    const productos = carritoItems.map((item) => {
-      let producto = null;
-      PRODUCTOS.forEach((p) => {
-        if (p.id === item.id) {
-          producto = p;
-        }
-      });
-      return { ...producto, cantidad: item.cantidad };
-    });
-    setProductosCarrito(productos);
-  };
-
-  const manejarAgregarProducto = (id) => {
-    agregarAlCarrito(id);
-    cargarCarrito();
-  };
-
-  const manejarRestarProducto = (id) => {
-    quitarDelCarrito(id);
-    cargarCarrito();
-  };
-
-  const manejarEliminarProducto = (id) => {
-    eliminarDelCarrito(id);
-    cargarCarrito();
-  };
-
-  const calcularCantidadTotal = () => {
-    return productosCarrito.reduce(
-      (total, producto) => total + producto.cantidad,
-      0
-    );
-  };
-
-  const calcularTotal = () => {
-    return productosCarrito.reduce(
-      (total, producto) => total + producto.precio * producto.cantidad,
-      0
-    );
-  };
-
-  const manejarPago = () => {
-    // Generar datos de la boleta
-    const boletaData = {
-      id: Date.now(),
-      fecha: new Date().toLocaleDateString('es-CL'),
-      productos: productosCarrito.map(p => ({
-        nombre: p.nombre,
-        cantidad: p.cantidad,
-        precio: p.precio
-      })),
-      total: calcularTotal(),
-      usuarioId: cuentaIniciada() ? obtenerUsuarioActual().correo : null
+    const cargarProductosBD = async () => {
+      try {
+        const productos = await getProductos();
+        setProductosBD(productos);
+      } catch (error) {
+        console.error("Error cargando productos desde BD:", error);
+      }
     };
 
-    // Guardar en localStorage si el usuario está logueado
-    if (cuentaIniciada()) {
-      const tickets = localStorage.getItem('tickets');
-      const ticketsArray = tickets ? JSON.parse(tickets) : [];
-      ticketsArray.push(boletaData);
-      localStorage.setItem('tickets', JSON.stringify(ticketsArray));
+    cargarProductosBD();
+  }, []);
+
+  // Cargar carrito + escuchar cambios
+  useEffect(() => {
+    const actualizarCarrito = () => {
+      const items = obtenerCarrito();
+      setCarrito(items);
+    };
+
+    actualizarCarrito();
+    window.addEventListener("carritoActualizado", actualizarCarrito);
+
+    return () => {
+      window.removeEventListener("carritoActualizado", actualizarCarrito);
+    };
+  }, []);
+
+  // Merge carrito + productosBD
+  useEffect(() => {
+    if (!carrito.length || !productosBD.length) {
+      setProductosCarrito([]);
+      return;
     }
 
-    Swal.fire({
-      icon: "success",
-      title: "¡Compra realizada con éxito!",
-      text: "Tu pedido ha sido procesado correctamente",
-      toast: true,
-      position: "bottom-center",
-      timer: 2000,
-      showConfirmButton: false,
-    });
+    const productos = carrito
+      .map((item) => {
+        const p = productosBD.find((prod) => prod.id === item.id);
+        if (!p) return null;
 
-    setTimeout(() => {
-      vaciarCarrito();
-      navigate('/boleta', { state: { boletaData } });
-    }, 2000);
+        return {
+          ...p,
+          nombre: p.nombre || p.name,
+          precio: p.precio || p.price,
+          imagen: p.imagen || p.urlImage || p.image,
+          cantidad: item.cantidad,
+        };
+      })
+      .filter(Boolean);
+
+    setProductosCarrito(productos);
+  }, [carrito, productosBD]);
+
+  // Acciones
+  const manejarAgregarProducto = (id) => agregarAlCarrito(id);
+  const manejarRestarProducto = (id) => quitarDelCarrito(id);
+  const manejarEliminarProducto = (id) => eliminarDelCarrito(id);
+
+  // Totales
+  const calcularCantidadTotal = () =>
+    productosCarrito.reduce((total, p) => total + p.cantidad, 0);
+
+  const calcularTotal = () =>
+    productosCarrito.reduce(
+      (total, p) => total + Number(p.precio || 0) * p.cantidad,
+      0
+    );
+
+  // Crear ticket y detalles
+  const manejarPago = async () => {
+    const boletaData = {
+      purchaseDate: new Date(), // Usamos la fecha actual
+      total: calcularTotal(),
+      items: productosCarrito.map((producto) => ({
+        productId: producto.id,
+        amount: producto.cantidad,
+        price: producto.precio,
+        subtotal: producto.precio * producto.cantidad,
+      })),
+    };
+
+    try {
+      // 1) Enviar ticket (junto con los detalles) al backend
+      const response = await fetch("http://localhost:8080/api/tickets", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("authToken")}`, // Incluir el token JWT
+        },
+        body: JSON.stringify(boletaData), // Enviar ticket completo
+      });
+
+      if (!response.ok) {
+        throw new Error("Error al procesar el pago");
+      }
+
+      const ticket = await response.json(); // Recibir respuesta del ticket creado
+
+      // 2) Confirmación de compra
+      Swal.fire({
+        icon: "success",
+        title: "¡Compra realizada con éxito!",
+        text: "Tu pedido ha sido procesado correctamente.",
+        toast: true,
+        position: "bottom-center",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+
+      setTimeout(() => {
+        vaciarCarrito();
+        navigate("/boleta", { state: { boletaData: ticket } });
+      }, 2000);
+    } catch (error) {
+      console.error("Error:", error);
+      Swal.fire({
+        icon: "error",
+        title: "¡Error!",
+        text: "No se pudo procesar la compra, por favor intenta nuevamente.",
+      });
+    }
   };
 
-  // SI EL CARRITO ESTA VACIO
+  // Carrito vacío
   if (productosCarrito.length === 0) {
     return (
       <Container className="carrito-vacio">
@@ -124,17 +168,19 @@ function Carrito() {
     );
   }
 
-  // SI EL CARRITO TIENE PRODUCTOS
+  // Render principal
   return (
     <Container className="carrito-container">
       <h2 className="text-white mb-4">Mi Carrito</h2>
 
       <Row>
+        {/* IZQUIERDA: lista de productos */}
         <Col lg={8}>
           <Card className="productos-card">
             <Card.Header>
               <h5>Productos ({calcularCantidadTotal()} items)</h5>
             </Card.Header>
+
             <Card.Body className="p-0">
               {productosCarrito.map((producto) => (
                 <div key={producto.id} className="producto-item">
@@ -146,13 +192,14 @@ function Carrito() {
                         className="producto-imagen"
                       />
                     </Col>
+
                     <Col xs={9} md={4}>
                       <h6 className="producto-nombre">{producto.nombre}</h6>
-                      <p className="producto-id">ID: {producto.id}</p>
                       <p className="producto-precio">
-                        ${producto.precio.toLocaleString()} CLP/kg
+                        ${Number(producto.precio || 0).toLocaleString()} CLP
                       </p>
                     </Col>
+
                     <Col xs={12} md={3} className="cantidad-controls">
                       <div className="cantidad-wrapper">
                         <Button
@@ -162,7 +209,9 @@ function Carrito() {
                         >
                           -
                         </Button>
+
                         <span className="cantidad">{producto.cantidad}</span>
+
                         <Button
                           variant="outline-secondary"
                           size="sm"
@@ -172,12 +221,16 @@ function Carrito() {
                         </Button>
                       </div>
                     </Col>
+
                     <Col xs={6} md={2}>
                       <p className="subtotal">
                         $
-                        {(producto.precio * producto.cantidad).toLocaleString()}
+                        {(
+                          Number(producto.precio || 0) * producto.cantidad
+                        ).toLocaleString()}
                       </p>
                     </Col>
+
                     <Col xs={6} md={1}>
                       <Button
                         variant="outline-danger"
@@ -193,23 +246,24 @@ function Carrito() {
             </Card.Body>
           </Card>
         </Col>
-        {/*LADO DERECHO*/}
+
+        {/* DERECHA: resumen */}
         <Col lg={4}>
           <Card className="resumen-card">
             <Card.Header>
               <h5>Resumen de Compra</h5>
             </Card.Header>
+
             <Card.Body>
               <ListGroup variant="flush">
-                {productosCarrito.map((producto) => (
-                  <ListGroup.Item key={producto.id} className="resumen-item">
+                {productosCarrito.map((p) => (
+                  <ListGroup.Item key={p.id} className="resumen-item">
                     <div className="d-flex justify-content-between">
-                      <span className="producto-resumen">
-                        {producto.nombre} x{producto.cantidad}
+                      <span>
+                        {p.nombre} x{p.cantidad}
                       </span>
                       <span>
-                        $
-                        {(producto.precio * producto.cantidad).toLocaleString()}
+                        ${(Number(p.precio || 0) * p.cantidad).toLocaleString()}
                       </span>
                     </div>
                   </ListGroup.Item>
@@ -223,6 +277,7 @@ function Carrito() {
                   <span>Subtotal:</span>
                   <span>${calcularTotal().toLocaleString()}</span>
                 </div>
+
                 <div className="d-flex justify-content-between mb-3">
                   <strong>Total:</strong>
                   <strong className="total-precio">
@@ -230,9 +285,10 @@ function Carrito() {
                   </strong>
                 </div>
               </div>
-              <Button 
-                variant="success" 
-                size="lg" 
+
+              <Button
+                variant="success"
+                size="lg"
                 className="w-100 btn-pagar"
                 onClick={manejarPago}
               >
