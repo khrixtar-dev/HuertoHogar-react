@@ -42,24 +42,12 @@ export default function LoginCliente() {
 
       const decoded = jwtDecode(data.token);
       const nombre = decoded.sub?.split("@")[0] || "Usuario";
-
-      if (decoded.type === "ADMIN") {
-        Swal.fire({
-          icon: "error",
-          title: "Acceso denegado",
-          text: "Las cuentas de administrador no pueden iniciar sesión aquí.",
-          toast: true,
-          position: "bottom-center",
-          timer: 2500,
-          showConfirmButton: false,
-        });
-        return;
-      }
+      const isAdmin = decoded.type === "ADMIN";
 
       setSesion({
         nombre: nombre,
         correo: email,
-        admin: decoded.type === "ADMIN",
+        admin: isAdmin,
       });
 
       window.dispatchEvent(new Event("sesionActualizada"));
@@ -74,7 +62,7 @@ export default function LoginCliente() {
         showConfirmButton: false,
       });
 
-      setTimeout(() => navigate("/"), 1500);
+      setTimeout(() => navigate(isAdmin ? "/admin" : "/"), 1500);
     } catch (error) {
       Swal.fire({
         icon: "error",

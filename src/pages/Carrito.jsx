@@ -68,9 +68,9 @@ function Carrito() {
 
         return {
           ...p,
-          nombre: p.nombre || p.name,
-          precio: p.precio || p.price,
-          imagen: p.imagen || p.urlImage || p.image,
+          nombre: p.name,
+          precio: p.price,
+          imagen: p.urlImage,
           cantidad: item.cantidad,
         };
       })
@@ -97,7 +97,7 @@ function Carrito() {
   // Crear ticket y detalles
   const manejarPago = async () => {
     const boletaData = {
-      purchaseDate: new Date(), // Usamos la fecha actual
+      purchaseDate: new Date().toISOString(),
       total: calcularTotal(),
       items: productosCarrito.map((producto) => ({
         productId: producto.id,
@@ -106,6 +106,9 @@ function Carrito() {
         subtotal: producto.precio * producto.cantidad,
       })),
     };
+
+    console.log("Enviando pago:", boletaData);
+    console.log("Token:", localStorage.getItem("authToken"));
 
     try {
       // 1) Enviar ticket (junto con los detalles) al backend
@@ -119,7 +122,8 @@ function Carrito() {
       });
 
       if (!response.ok) {
-        throw new Error("Error al procesar el pago");
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Error ${response.status}: ${response.statusText}`);
       }
 
       const ticket = await response.json(); // Recibir respuesta del ticket creado
@@ -144,7 +148,7 @@ function Carrito() {
       Swal.fire({
         icon: "error",
         title: "¡Error!",
-        text: "No se pudo procesar la compra, por favor intenta nuevamente.",
+        text: error.message || "No se pudo procesar la compra, por favor intenta nuevamente.",
       });
     }
   };

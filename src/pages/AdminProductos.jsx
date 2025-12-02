@@ -1,92 +1,111 @@
 import React, { useEffect, useState } from "react";
-import { PRODUCTOS } from "../../public/js/productos_catalogo";
+import { getProductos, crearProducto, actualizarProducto, eliminarProducto } from "../api/productApi";
 import "../css/admin-productos.css";
 
 export default function AdminProductos() {
   const [listaProductos, setListaProductos] = useState([]);
   const [editandoId, setEditandoId] = useState(null);
   const [nuevoProducto, setNuevoProducto] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // Cargar datos al montar
   useEffect(() => {
-    try {
-      const data = JSON.parse(localStorage.getItem("listaProductos"));
-      if (Array.isArray(data) && data.length > 0) {
-        setListaProductos(data);
-      } else {
-        setListaProductos(PRODUCTOS);
-        localStorage.setItem("listaProductos", JSON.stringify(PRODUCTOS));
-      }
-    } catch (err) {
-      console.error("Error cargando productos:", err);
-      setListaProductos(PRODUCTOS);
-    }
+    cargarProductos();
   }, []);
 
-  // Guardar cada vez que cambia la lista
-  useEffect(() => {
-    if (listaProductos.length > 0) {
-      localStorage.setItem("listaProductos", JSON.stringify(listaProductos));
-      console.log("Guardado en localStorage:", listaProductos.length);
-
-      // Disparar evento para notificar cambios 
-      window.dispatchEvent(new Event('productosActualizados'));
+  const cargarProductos = async () => {
+    try {
+      setLoading(true);
+      const data = await getProductos();
+      setListaProductos(data);
+    } catch (err) {
+      console.error("Error cargando productos:", err);
+      alert("Error al cargar productos");
+    } finally {
+      setLoading(false);
     }
-  }, [listaProductos]);
+  };
 
-  // Agregar nuevo producto
   const handleAgregar = () => {
     setNuevoProducto({
-      id: "",
-      nombre: "",
-      precio: "",
-      imagen: "",
-      descripcion: "",
+      name: "",
+      price: "",
+      urlImage: "",
+      description: ""
     });
   };
 
-  const handleGuardarNuevo = () => {
-    if (
-      !nuevoProducto.id ||
-      !nuevoProducto.nombre ||
-      !nuevoProducto.precio ||
-      !nuevoProducto.imagen ||
-      !nuevoProducto.descripcion
-    ) {
+  const handleGuardarNuevo = async () => {
+    if (!nuevoProducto.name || !nuevoProducto.price || !nuevoProducto.urlImage || !nuevoProducto.description) {
       alert("Todos los campos son obligatorios");
       return;
     }
 
-    if (isNaN(nuevoProducto.precio)) {
+    if (isNaN(nuevoProducto.price)) {
       alert("El precio debe ser un número válido");
       return;
     }
 
-    if (listaProductos.some((p) => p.id === nuevoProducto.id)) {
-      alert("El ID ya existe");
+    try {
+      await crearProducto({
+        name: nuevoProducto.name,
+        description: nuevoProducto.description,
+        price: parseFloat(nuevoProducto.price),
+        urlImage: nuevoProducto.urlImage
+      });
+      await cargarProductos();
+      setNuevoProducto(null);
+      alert("Producto creado exitosamente");
+    } catch (error) {
+      console.error("Error creando producto:", error);
+      console.error("Respuesta del servidor:", error.response?.data);
+      alert("Error al crear el producto");
+    }
+  };
+
+  const handleEditar = (id) => setEditandoId(id);
+
+  const handleGuardarEdicion = async (id, producto) => {
+    if (!producto.name || !producto.price || !producto.urlImage || !producto.description) {
+      alert("Todos los campos son obligatorios");
       return;
     }
 
-    const nuevo = { ...nuevoProducto, precio: Number(nuevoProducto.precio) };
-    setListaProductos((prev) => [...prev, nuevo]);
-    setNuevoProducto(null);
+    if (isNaN(producto.price)) {
+      alert("El precio debe ser un número válido");
+      return;
+    }
+
+    try {
+      const payload = {
+        name: producto.name,
+        description: producto.description,
+        price: parseFloat(producto.price),
+        urlImage: producto.urlImage,
+        category: producto.category || null
+      };
+      console.log("ID:", id, "Payload:", payload);
+      await actualizarProducto(id, payload);
+      await cargarProductos();
+      setEditandoId(null);
+      alert("Producto actualizado exitosamente");
+    } catch (error) {
+      console.error("Error actualizando producto:", error);
+      console.error("Respuesta del servidor:", error.response?.data);
+      alert("Error al actualizar el producto");
+    }
   };
 
-  // Editar producto
-  const handleEditar = (id) => setEditandoId(id);
-
-  // Guardar edición
-  const handleGuardarEdicion = (id, camposActualizados) => {
-    setListaProductos((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, ...camposActualizados } : p))
-    );
-    setEditandoId(null);
-  };
-
-  //  Eliminar producto
-  const handleEliminar = (id) => {
+  const handleEliminar = async (id) => {
     if (window.confirm("¿Eliminar este producto?")) {
-      setListaProductos((prev) => prev.filter((p) => p.id !== id));
+      try {
+        await eliminarProducto(id);
+        await cargarProductos();
+        alert("Producto eliminado exitosamente");
+      } catch (error) {
+        console.error("Error eliminando producto:", error);
+        console.error("Respuesta del servidor:", error.response?.data);
+        alert("Error al eliminar el producto");
+      }
     }
   };
 
@@ -94,6 +113,17 @@ export default function AdminProductos() {
     setEditandoId(null);
     setNuevoProducto(null);
   };
+
+  if (loading) {
+    return (
+      <main className="ad-prod-page">
+        <section className="ad-prod-container">
+          <h2>Gestión de Productos</h2>
+          <p>Cargando productos...</p>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="ad-prod-page">
@@ -113,16 +143,34 @@ export default function AdminProductos() {
               </tr>
             </thead>
             <tbody>
-              {/*  Nuevo producto */}
               {nuevoProducto && (
                 <tr className="ad-prod-row-new">
                   <td>
                     <input
                       type="text"
                       className="form-control"
-                      value={nuevoProducto.id}
+                      placeholder="Auto-generado"
+                      disabled
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={nuevoProducto.name}
                       onChange={(e) =>
-                        setNuevoProducto({ ...nuevoProducto, id: e.target.value, })
+                        setNuevoProducto({ ...nuevoProducto, name: e.target.value })
+                      }
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="form-control"
+                      value={nuevoProducto.price}
+                      onChange={(e) =>
+                        setNuevoProducto({ ...nuevoProducto, price: e.target.value })
                       }
                     />
                   </td>
@@ -130,35 +178,15 @@ export default function AdminProductos() {
                     <input
                       type="text"
                       className="form-control"
-                      value={nuevoProducto.nombre}
+                      placeholder="URL de imagen"
+                      value={nuevoProducto.urlImage}
                       onChange={(e) =>
-                        setNuevoProducto({ ...nuevoProducto, nombre: e.target.value, })
+                        setNuevoProducto({ ...nuevoProducto, urlImage: e.target.value })
                       }
                     />
-                  </td>
-                  <td>
-                    <input
-                      type="text"
-                      className="form-control"
-                      value={nuevoProducto.precio}
-                      onChange={(e) =>
-                        setNuevoProducto({ ...nuevoProducto, precio: e.target.value, })
-                      }
-                    />
-                  </td>
-                  <td>
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder="/img/productos_/nombre.png o URL"
-                      value={nuevoProducto.imagen}
-                      onChange={(e) =>
-                        setNuevoProducto({ ...nuevoProducto, imagen: e.target.value, })
-                      }
-                    />
-                    {nuevoProducto.imagen && (
+                    {nuevoProducto.urlImage && (
                       <img
-                        src={nuevoProducto.imagen}
+                        src={nuevoProducto.urlImage}
                         alt="Preview"
                         className="ad-prod-img"
                       />
@@ -168,9 +196,9 @@ export default function AdminProductos() {
                     <input
                       type="text"
                       className="form-control"
-                      value={nuevoProducto.descripcion}
+                      value={nuevoProducto.description}
                       onChange={(e) =>
-                        setNuevoProducto({ ...nuevoProducto, descripcion: e.target.value, })
+                        setNuevoProducto({ ...nuevoProducto, description: e.target.value })
                       }
                     />
                   </td>
@@ -191,7 +219,6 @@ export default function AdminProductos() {
                 </tr>
               )}
 
-              {/* Productos existentes */}
               {listaProductos.map((producto) =>
                 editandoId === producto.id ? (
                   <tr key={producto.id}>
@@ -200,12 +227,29 @@ export default function AdminProductos() {
                       <input
                         type="text"
                         className="form-control"
-                        value={producto.nombre}
+                        value={producto.name}
                         onChange={(e) =>
                           setListaProductos((prev) =>
                             prev.map((p) =>
                               p.id === producto.id
-                                ? { ...p, nombre: e.target.value }
+                                ? { ...p, name: e.target.value }
+                                : p
+                            )
+                          )
+                        }
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="number"
+                        step="0.01"
+                        className="form-control"
+                        value={producto.price}
+                        onChange={(e) =>
+                          setListaProductos((prev) =>
+                            prev.map((p) =>
+                              p.id === producto.id
+                                ? { ...p, price: e.target.value }
                                 : p
                             )
                           )
@@ -216,37 +260,21 @@ export default function AdminProductos() {
                       <input
                         type="text"
                         className="form-control"
-                        value={producto.precio}
+                        value={producto.urlImage}
                         onChange={(e) =>
                           setListaProductos((prev) =>
                             prev.map((p) =>
                               p.id === producto.id
-                                ? { ...p, precio: e.target.value }
+                                ? { ...p, urlImage: e.target.value }
                                 : p
                             )
                           )
                         }
                       />
-                    </td>
-                    <td>
-                      <input
-                        type="text"
-                        className="form-control"
-                        value={producto.imagen}
-                        onChange={(e) =>
-                          setListaProductos((prev) =>
-                            prev.map((p) =>
-                              p.id === producto.id
-                                ? { ...p, imagen: e.target.value }
-                                : p
-                            )
-                          )
-                        }
-                      />
-                      {producto.imagen && (
+                      {producto.urlImage && (
                         <img
-                          src={producto.imagen}
-                          alt={producto.nombre}
+                          src={producto.urlImage}
+                          alt={producto.name}
                           className="ad-prod-img"
                         />
                       )}
@@ -255,12 +283,12 @@ export default function AdminProductos() {
                       <input
                         type="text"
                         className="form-control"
-                        value={producto.descripcion}
+                        value={producto.description}
                         onChange={(e) =>
                           setListaProductos((prev) =>
                             prev.map((p) =>
                               p.id === producto.id
-                                ? { ...p, descripcion: e.target.value }
+                                ? { ...p, description: e.target.value }
                                 : p
                             )
                           )
@@ -287,16 +315,16 @@ export default function AdminProductos() {
                 ) : (
                   <tr key={producto.id}>
                     <td>{producto.id}</td>
-                    <td>{producto.nombre}</td>
-                    <td>${Number(producto.precio).toLocaleString()}</td>
+                    <td>{producto.name}</td>
+                    <td>${Number(producto.price).toLocaleString()}</td>
                     <td>
                       <img
-                        src={producto.imagen}
-                        alt={producto.nombre}
+                        src={producto.urlImage}
+                        alt={producto.name}
                         className="ad-prod-img"
                       />
                     </td>
-                    <td>{producto.descripcion}</td>
+                    <td>{producto.description}</td>
                     <td>
                       <button
                         className="ad-prod-btn blue"

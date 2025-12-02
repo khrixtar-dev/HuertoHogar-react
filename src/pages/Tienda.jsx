@@ -49,7 +49,7 @@ function Tienda() {
       const data = await getProductos();
       setProductos(data);
       
-      const categoriasUnicas = [...new Set(data.map(p => p.categoryName))];
+      const categoriasUnicas = [...new Set(data.map(p => p.categoryName).filter(c => c))];
       setCategorias(categoriasUnicas);
     } catch (error) {
       console.error('Error cargando productos:', error);
@@ -57,7 +57,7 @@ function Tienda() {
   };
 
   const productosFiltrados = filtroCategoria 
-    ? productos.filter(p => p.categoryName === filtroCategoria)
+    ? productos.filter(p => p.categoryName && p.categoryName === filtroCategoria)
     : productos;
 
   const VerProducto = (id) => {
