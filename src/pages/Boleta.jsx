@@ -1,86 +1,54 @@
-import React, { useEffect, useState } from 'react';
-import { Container, Row, Col, Card } from 'react-bootstrap';
-import { useLocation } from 'react-router-dom';
-import { obtenerUsuarioActual, cuentaIniciada } from '../../public/js/persistenciaLogin';
-import '../css/boleta.css';
+import React, { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
+import { Container, Card, ListGroup } from "react-bootstrap";
 
 function Boleta() {
   const location = useLocation();
-  const { boletaData } = location.state || {};
-  const [usuario, setUsuario] = useState(null);
+  const { boletaData } = location.state || {}; // Obtiene los datos del ticket desde la navegación
+
+  const [ticket, setTicket] = useState(null);
 
   useEffect(() => {
-    if (cuentaIniciada()) {
-      setUsuario(obtenerUsuarioActual());
+    if (boletaData) {
+      setTicket(boletaData); // Establecer los datos del ticket
     }
-  }, []);
+  }, [boletaData]);
 
-  if (!boletaData) {
-    return (
-      <Container className="boleta-container">
-        <Row className="justify-content-center">
-          <Col md={8} lg={6}>
-            <Card className="mt-5">
-              <Card.Body className="text-center">
-                <h3>No se encontraron datos de la boleta</h3>
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
-      </Container>
-    );
+  if (!ticket) {
+    return <div>Cargando...</div>;
   }
 
   return (
     <Container className="boleta-container">
-      <Row className="justify-content-center">
-        <Col md={10} lg={8}>
-          <Card className="mt-4 shadow">
-            <Card.Header className="text-center bg-success text-white">
-              <h3>HUERTO HOGAR SPA</h3>
-              <h5>BOLETA DE VENTA</h5>
-            </Card.Header>
-            <Card.Body>
-              <Row className="mb-3">
-                <Col md={6}>
-                  <p><strong>ID:</strong> {boletaData.id}</p>
-                  <p><strong>Cliente:</strong> {usuario ? `${usuario.nombre} ${usuario.apellido}` : 'Invitado'}</p>
-                </Col>
-                <Col md={6} className="text-end">
-                  <p><strong>Fecha:</strong> {boletaData.fecha}</p>
-                </Col>
-              </Row>
+      <h2 className="text-center my-4">Tu Boleta</h2>
 
-              {boletaData.productos.map((producto, index) => (
-                <Card key={index} className="mb-2">
-                  <Card.Body className="py-2">
-                    <Row className="align-items-center">
-                      <Col md={5}>
-                        <strong>{producto.nombre}</strong>
-                      </Col>
-                      <Col md={2} className="text-center">
-                        x{producto.cantidad}
-                      </Col>
-                      <Col md={3} className="text-center">
-                        ${producto.precio.toLocaleString()}
-                      </Col>
-                      <Col md={2} className="text-end">
-                        <strong>${(producto.precio * producto.cantidad).toLocaleString()}</strong>
-                      </Col>
-                    </Row>
-                  </Card.Body>
-                </Card>
-              ))}
+      <Card className="mb-4">
+        <Card.Header>
+          <h5>Detalles de la Compra</h5>
+        </Card.Header>
+        <Card.Body>
+          <p>
+            <strong>Fecha de compra:</strong>{" "}
+            {new Date(ticket.purchaseDate).toLocaleString()}
+          </p>
+          <p>
+            <strong>Total:</strong> ${ticket.total.toLocaleString()} CLP
+          </p>
 
-              <Card className="mt-3 bg-light">
-                <Card.Body className="text-center">
-                  <h4><strong>Total: ${boletaData.total.toLocaleString()} CLP</strong></h4>
-                </Card.Body>
-              </Card>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
+          <ListGroup variant="flush">
+            {ticket.items.map((item) => (
+              <ListGroup.Item key={item.productId}>
+                <div className="d-flex justify-content-between">
+                  <span>
+                    {item.productName} x{item.amount}
+                  </span>
+                  <span>${item.subtotal.toLocaleString()}</span>
+                </div>
+              </ListGroup.Item>
+            ))}
+          </ListGroup>
+        </Card.Body>
+      </Card>
     </Container>
   );
 }
