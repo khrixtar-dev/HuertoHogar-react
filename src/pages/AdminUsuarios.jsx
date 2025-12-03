@@ -1,131 +1,100 @@
 import { useEffect, useState } from "react";
-import { usuarios as USUARIOS_BASE } from "../../public/js/usuarios";
-import { getUsuarios } from "../api/userApi";
+import { getUsuarios, actualizarUsuario, eliminarUsuario } from "../api/userApi";
+import { useAuth } from "../context/AuthContext";
 import "../css/admin-usuarios.css";
 
 export default function AdminUsuarios() {
+  const { user } = useAuth();
   const [listaUsuarios, setListaUsuarios] = useState([]);
   const [editandoId, setEditandoId] = useState(null);
-  const [nuevoUsuario, setNuevoUsuario] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   const emailRegex = /^[\w._%+-]+@(duoc\.cl|profesor\.duoc\.cl|gmail\.com)$/;
 
-  // Cargar usuarios al inicio
   useEffect(() => {
-    const cargarUsuarios = async () => {
-      try {
-        console.log("Cargando usuarios...");
-        const data = await getUsuarios();
-        console.log("Usuarios recibidos:", data);
-        const usuariosFormateados = data.map(u => ({
-          id: u.id,
-          nombre: u.firstname,
-          apellido: u.lastname,
-          correo: u.email,
-          contraseña: "",
-          admin: u.type === "ADMIN"
-        }));
-        console.log("Usuarios formateados:", usuariosFormateados);
-        setListaUsuarios(usuariosFormateados);
-      } catch (err) {
-        console.error("Error cargando usuarios:", err);
-        console.error("Detalles:", err.response?.data);
-        setListaUsuarios([]);
-      }
-    };
     cargarUsuarios();
   }, []);
 
-
-
-  // Agregar usuario
-  const handleAgregar = () => {
-    setNuevoUsuario({
-      id: "",
-      nombre: "",
-      apellido: "",
-      correo: "",
-      contraseña: "",
-      admin: false,
-    });
+  const cargarUsuarios = async () => {
+    try {
+      setLoading(true);
+      const data = await getUsuarios();
+      setListaUsuarios(data);
+    } catch (err) {
+      console.error("Error cargando usuarios:", err);
+      alert("Error al cargar usuarios");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Guardar nuevo usuario
-  const handleGuardarNuevo = () => {
-    const u = {
-      ...nuevoUsuario,
-      id: String(nuevoUsuario.id).trim(),
-      nombre: nuevoUsuario.nombre.trim(),
-      apellido: nuevoUsuario.apellido.trim(),
-      correo: nuevoUsuario.correo.trim(),
-      contraseña: nuevoUsuario.contraseña.trim(),
-    };
+  const handleEditar = (id, email) => {
+    if (user?.email === email) {
+      alert("No puedes editar tu propia cuenta");
+      return;
+    }
+    setEditandoId(id);
+  };
 
-    if (!u.id || !u.nombre || !u.apellido || !u.correo || !u.contraseña) {
+  const handleGuardarEdicion = async (id, usuario) => {
+    if (!usuario.firstname || !usuario.lastname || !usuario.email) {
       alert("Todos los campos son obligatorios");
       return;
     }
 
-    if (!emailRegex.test(u.correo)) {
-      alert(
-        "Correo inválido. Solo se permiten duoc.cl, profesor.duoc.cl y gmail.com"
-      );
+    if (!emailRegex.test(usuario.email)) {
+      alert("Correo inválido. Solo se permiten duoc.cl, profesor.duoc.cl y gmail.com");
       return;
     }
 
-    if (listaUsuarios.some((user) => String(user.id) === String(u.id))) {
-      alert("El ID ya existe");
-      return;
+    try {
+      const payload = {
+        firstname: usuario.firstname,
+        lastname: usuario.lastname,
+        email: usuario.email,
+        type: usuario.type
+      };
+      await actualizarUsuario(id, payload);
+      await cargarUsuarios();
+      setEditandoId(null);
+      alert("Usuario actualizado exitosamente");
+    } catch (error) {
+      console.error("Error actualizando usuario:", error);
+      alert(error.response?.data || "Error al actualizar el usuario");
     }
-
-    setListaUsuarios((prev) => [...prev, u]);
-    setNuevoUsuario(null);
   };
 
-  // Editar usuario
-  const handleEditar = (id) => setEditandoId(id);
-
-  // Guardar edición
-  const handleGuardarEdicion = (id) => {
-    const usuarioEditado = listaUsuarios.find((u) => u.id === id);
-    if (!usuarioEditado) return;
-
-    const u = {
-      ...usuarioEditado,
-      nombre: usuarioEditado.nombre?.trim() || "",
-      apellido: usuarioEditado.apellido?.trim() || "",
-      correo: usuarioEditado.correo?.trim() || "",
-      contraseña: usuarioEditado.contraseña?.trim() || "",
-    };
-
-    if (!u.nombre || !u.apellido || !u.correo || !u.contraseña) {
-      alert("Todos los campos son obligatorios");
+  const handleEliminar = async (id, email) => {
+    if (user?.email === email) {
+      alert("No puedes eliminar tu propia cuenta");
       return;
     }
-
-    if (!emailRegex.test(u.correo)) {
-      alert(
-        "Correo inválido. Solo se permiten duoc.cl, profesor.duoc.cl y gmail.com"
-      );
-      return;
-    }
-
-    setListaUsuarios((prev) => prev.map((user) => (user.id === id ? u : user)));
-    setEditandoId(null);
-  };
-
-  // Eliminar usuario
-  const handleEliminar = (id) => {
     if (window.confirm("¿Eliminar este usuario?")) {
-      setListaUsuarios((prev) => prev.filter((u) => u.id !== id));
+      try {
+        await eliminarUsuario(id);
+        await cargarUsuarios();
+        alert("Usuario eliminado exitosamente");
+      } catch (error) {
+        console.error("Error eliminando usuario:", error);
+        alert(error.response?.data || "Error al eliminar el usuario");
+      }
     }
   };
 
-  // Cancelar acción
   const handleCancelar = () => {
     setEditandoId(null);
-    setNuevoUsuario(null);
   };
+
+  if (loading) {
+    return (
+      <main className="ad-usr-page">
+        <section className="ad-usr-container">
+          <h2>Gestión de Usuarios</h2>
+          <p>Cargando usuarios...</p>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="ad-usr-page">
@@ -145,26 +114,118 @@ export default function AdminUsuarios() {
               </tr>
             </thead>
             <tbody>
-
-
-              {listaUsuarios.map((usuario) => (
-                <tr key={usuario.id}>
-                  <td>{usuario.id}</td>
-                  <td>{usuario.nombre}</td>
-                  <td>{usuario.apellido}</td>
-                  <td>{usuario.correo}</td>
-                  <td>{usuario.admin ? "ADMIN" : "CLIENTE"}</td>
-                  <td>
-                    <button className="ad-usr-btn blue">Editar</button>
-                    <button className="ad-usr-btn red">Eliminar</button>
-                  </td>
-                </tr>
-              ))}
+              {listaUsuarios.map((usuario) =>
+                editandoId === usuario.id ? (
+                  <tr key={usuario.id}>
+                    <td>{usuario.id}</td>
+                    <td>
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={usuario.firstname}
+                        onChange={(e) =>
+                          setListaUsuarios((prev) =>
+                            prev.map((u) =>
+                              u.id === usuario.id
+                                ? { ...u, firstname: e.target.value }
+                                : u
+                            )
+                          )
+                        }
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={usuario.lastname}
+                        onChange={(e) =>
+                          setListaUsuarios((prev) =>
+                            prev.map((u) =>
+                              u.id === usuario.id
+                                ? { ...u, lastname: e.target.value }
+                                : u
+                            )
+                          )
+                        }
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="email"
+                        className="form-control"
+                        value={usuario.email}
+                        onChange={(e) =>
+                          setListaUsuarios((prev) =>
+                            prev.map((u) =>
+                              u.id === usuario.id
+                                ? { ...u, email: e.target.value }
+                                : u
+                            )
+                          )
+                        }
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={usuario.type === "ADMIN"}
+                        onChange={(e) =>
+                          setListaUsuarios((prev) =>
+                            prev.map((u) =>
+                              u.id === usuario.id
+                                ? { ...u, type: e.target.checked ? "ADMIN" : "USER" }
+                                : u
+                            )
+                          )
+                        }
+                      />
+                      <span style={{ marginLeft: "0.5rem" }}>{usuario.type}</span>
+                    </td>
+                    <td>
+                      <button
+                        className="ad-usr-btn green"
+                        onClick={() =>
+                          handleGuardarEdicion(usuario.id, usuario)
+                        }
+                      >
+                        Guardar
+                      </button>
+                      <button
+                        className="ad-usr-btn gray"
+                        onClick={handleCancelar}
+                      >
+                        Cancelar
+                      </button>
+                    </td>
+                  </tr>
+                ) : (
+                  <tr key={usuario.id}>
+                    <td>{usuario.id}</td>
+                    <td>{usuario.firstname}</td>
+                    <td>{usuario.lastname}</td>
+                    <td>{usuario.email}</td>
+                    <td>{usuario.type}</td>
+                    <td>
+                      <button
+                        className="ad-usr-btn blue"
+                        onClick={() => handleEditar(usuario.id, usuario.email)}
+                      >
+                        Editar
+                      </button>
+                      <button
+                        className="ad-usr-btn red"
+                        onClick={() => handleEliminar(usuario.id, usuario.email)}
+                      >
+                        Eliminar
+                      </button>
+                    </td>
+                  </tr>
+                )
+              )}
             </tbody>
           </table>
         </div>
-
-
       </section>
     </main>
   );

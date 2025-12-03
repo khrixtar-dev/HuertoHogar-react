@@ -43,6 +43,7 @@ export function iniciarSesion(correo, contraseña) {
 export function cerrarSesion() {
   remove("cuentaIniciada");
   remove("usuarioActual");
+  remove("authToken");
 }
 
 // Registra un nuevo usuario en el sistema
