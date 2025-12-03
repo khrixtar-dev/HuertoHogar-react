@@ -1,25 +1,36 @@
 import React, { useEffect, useState } from "react";
-import { getProductos, crearProducto, actualizarProducto, eliminarProducto } from "../api/productApi";
+import {
+  getProductos,
+  getCategorias,
+  crearProducto,
+  actualizarProducto,
+  eliminarProducto,
+} from "../api/productApi";
 import "../css/admin-productos.css";
 
 export default function AdminProductos() {
   const [listaProductos, setListaProductos] = useState([]);
+  const [categorias, setCategorias] = useState([]);
   const [editandoId, setEditandoId] = useState(null);
   const [nuevoProducto, setNuevoProducto] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    cargarProductos();
+    cargarDatos();
   }, []);
 
-  const cargarProductos = async () => {
+  const cargarDatos = async () => {
     try {
       setLoading(true);
-      const data = await getProductos();
-      setListaProductos(data);
+      const [productos, cats] = await Promise.all([
+        getProductos(),
+        getCategorias(),
+      ]);
+      setListaProductos(productos);
+      setCategorias(cats);
     } catch (err) {
-      console.error("Error cargando productos:", err);
-      alert("Error al cargar productos");
+      console.error("Error cargando datos:", err);
+      alert("Error al cargar datos");
     } finally {
       setLoading(false);
     }
@@ -30,12 +41,19 @@ export default function AdminProductos() {
       name: "",
       price: "",
       urlImage: "",
-      description: ""
+      description: "",
+      category: null,
     });
   };
 
   const handleGuardarNuevo = async () => {
-    if (!nuevoProducto.name || !nuevoProducto.price || !nuevoProducto.urlImage || !nuevoProducto.description) {
+    if (
+      !nuevoProducto.name ||
+      !nuevoProducto.price ||
+      !nuevoProducto.urlImage ||
+      !nuevoProducto.description ||
+      !nuevoProducto.category
+    ) {
       alert("Todos los campos son obligatorios");
       return;
     }
@@ -50,14 +68,14 @@ export default function AdminProductos() {
         name: nuevoProducto.name,
         description: nuevoProducto.description,
         price: parseFloat(nuevoProducto.price),
-        urlImage: nuevoProducto.urlImage
+        urlImage: nuevoProducto.urlImage,
+        category: nuevoProducto.category,
       });
-      await cargarProductos();
+      await cargarDatos();
       setNuevoProducto(null);
       alert("Producto creado exitosamente");
     } catch (error) {
       console.error("Error creando producto:", error);
-      console.error("Respuesta del servidor:", error.response?.data);
       alert("Error al crear el producto");
     }
   };
@@ -65,7 +83,12 @@ export default function AdminProductos() {
   const handleEditar = (id) => setEditandoId(id);
 
   const handleGuardarEdicion = async (id, producto) => {
-    if (!producto.name || !producto.price || !producto.urlImage || !producto.description) {
+    if (
+      !producto.name ||
+      !producto.price ||
+      !producto.urlImage ||
+      !producto.description
+    ) {
       alert("Todos los campos son obligatorios");
       return;
     }
@@ -81,16 +104,14 @@ export default function AdminProductos() {
         description: producto.description,
         price: parseFloat(producto.price),
         urlImage: producto.urlImage,
-        category: producto.category || null
+        category: producto.category || null,
       };
-      console.log("ID:", id, "Payload:", payload);
       await actualizarProducto(id, payload);
-      await cargarProductos();
+      await cargarDatos();
       setEditandoId(null);
       alert("Producto actualizado exitosamente");
     } catch (error) {
       console.error("Error actualizando producto:", error);
-      console.error("Respuesta del servidor:", error.response?.data);
       alert("Error al actualizar el producto");
     }
   };
@@ -99,11 +120,10 @@ export default function AdminProductos() {
     if (window.confirm("¿Eliminar este producto?")) {
       try {
         await eliminarProducto(id);
-        await cargarProductos();
+        await cargarDatos();
         alert("Producto eliminado exitosamente");
       } catch (error) {
         console.error("Error eliminando producto:", error);
-        console.error("Respuesta del servidor:", error.response?.data);
         alert("Error al eliminar el producto");
       }
     }
@@ -137,6 +157,7 @@ export default function AdminProductos() {
                 <th>ID</th>
                 <th>Nombre</th>
                 <th>Precio</th>
+                <th>Categoría</th>
                 <th>Imagen</th>
                 <th>Descripción</th>
                 <th>Acciones</th>
@@ -159,7 +180,10 @@ export default function AdminProductos() {
                       className="form-control"
                       value={nuevoProducto.name}
                       onChange={(e) =>
-                        setNuevoProducto({ ...nuevoProducto, name: e.target.value })
+                        setNuevoProducto({
+                          ...nuevoProducto,
+                          name: e.target.value,
+                        })
                       }
                     />
                   </td>
@@ -170,9 +194,34 @@ export default function AdminProductos() {
                       className="form-control"
                       value={nuevoProducto.price}
                       onChange={(e) =>
-                        setNuevoProducto({ ...nuevoProducto, price: e.target.value })
+                        setNuevoProducto({
+                          ...nuevoProducto,
+                          price: e.target.value,
+                        })
                       }
                     />
+                  </td>
+                  <td>
+                    <select
+                      className="form-control"
+                      value={nuevoProducto.category?.id || ""}
+                      onChange={(e) => {
+                        const cat = categorias.find(
+                          (c) => c.id === parseInt(e.target.value)
+                        );
+                        setNuevoProducto({
+                          ...nuevoProducto,
+                          category: cat || null,
+                        });
+                      }}
+                    >
+                      <option value="">Seleccionar categoría</option>
+                      {categorias.map((cat) => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </option>
+                      ))}
+                    </select>
                   </td>
                   <td>
                     <input
@@ -181,7 +230,10 @@ export default function AdminProductos() {
                       placeholder="URL de imagen"
                       value={nuevoProducto.urlImage}
                       onChange={(e) =>
-                        setNuevoProducto({ ...nuevoProducto, urlImage: e.target.value })
+                        setNuevoProducto({
+                          ...nuevoProducto,
+                          urlImage: e.target.value,
+                        })
                       }
                     />
                     {nuevoProducto.urlImage && (
@@ -198,7 +250,10 @@ export default function AdminProductos() {
                       className="form-control"
                       value={nuevoProducto.description}
                       onChange={(e) =>
-                        setNuevoProducto({ ...nuevoProducto, description: e.target.value })
+                        setNuevoProducto({
+                          ...nuevoProducto,
+                          description: e.target.value,
+                        })
                       }
                     />
                   </td>
@@ -255,6 +310,31 @@ export default function AdminProductos() {
                           )
                         }
                       />
+                    </td>
+                    <td>
+                      <select
+                        className="form-control"
+                        value={producto.category?.id || ""}
+                        onChange={(e) => {
+                          const cat = categorias.find(
+                            (c) => c.id === parseInt(e.target.value)
+                          );
+                          setListaProductos((prev) =>
+                            prev.map((p) =>
+                              p.id === producto.id
+                                ? { ...p, category: cat || null }
+                                : p
+                            )
+                          );
+                        }}
+                      >
+                        <option value="">Sin categoría</option>
+                        {categorias.map((cat) => (
+                          <option key={cat.id} value={cat.id}>
+                            {cat.name}
+                          </option>
+                        ))}
+                      </select>
                     </td>
                     <td>
                       <input
@@ -317,6 +397,7 @@ export default function AdminProductos() {
                     <td>{producto.id}</td>
                     <td>{producto.name}</td>
                     <td>${Number(producto.price).toLocaleString()}</td>
+                    <td>{producto.categoryName || "-"}</td>
                     <td>
                       <img
                         src={producto.urlImage}
