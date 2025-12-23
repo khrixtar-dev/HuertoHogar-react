@@ -10,6 +10,11 @@ export const getProductoById = async (id) => {
   return resp.data;
 };
 
+export const getCategorias = async () => {
+  const resp = await API.get("/api/products/categories/all");
+  return resp.data;
+};
+
 export const crearProducto = async (producto) => {
   const resp = await API.post("/api/products", producto);
   return resp.data;

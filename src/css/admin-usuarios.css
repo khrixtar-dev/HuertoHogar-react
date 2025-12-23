@@ -1,4 +1,3 @@
-
 .ad-usr-page {
   background-color: #2b2b2b;
   min-height: 100vh;
@@ -35,6 +34,7 @@
   text-align: center;
   padding: 0.8rem;
   border-bottom: 1px solid #ddd;
+  vertical-align: middle;
 }
 
 .ad-usr-table tr:nth-child(even) {
@@ -46,11 +46,14 @@
 }
 
 .ad-usr-table input[type="text"],
-.ad-usr-table input[type="email"] {
+.ad-usr-table input[type="email"],
+.ad-usr-table input[type="password"],
+.ad-usr-table select {
   width: 100%;
   padding: 0.3rem 0.4rem;
   border: 1px solid #ccc;
   border-radius: 5px;
+  box-sizing: border-box;
 }
 
 .ad-usr-btn {
@@ -62,6 +65,7 @@
   cursor: pointer;
   transition: 0.2s;
   margin: 2px;
+  display: inline-block;
 }
 
 .ad-usr-btn.blue {
@@ -74,8 +78,6 @@
 
 .ad-usr-btn.green {
   background-color: #28a745;
-  display: block;
-  margin: 1.5rem auto 0;
 }
 
 .ad-usr-btn.gray {

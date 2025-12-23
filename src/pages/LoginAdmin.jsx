@@ -65,7 +65,7 @@ export default function LoginAdmin() {
 
       Swal.fire({
         icon: "success",
-        title: "Bienvenido",
+        title: `Bienvenido ${nombre}`,
         text: "Accediendo...",
         toast: true,
         position: "bottom-center",
@@ -74,7 +74,7 @@ export default function LoginAdmin() {
       });
 
       setTimeout(() => {
-        navigate("/");
+        navigate("/admin");
       }, 1800);
     } catch (error) {
       Swal.fire({
